@@ -178,6 +178,40 @@ local function handleMessage(message)
     
     print("[PBI CORE] Command Received:", action, "Target:", target)
 
+    -- CHECK FOR SOFT SHUTDOWN (UPDATE)
+    if action == "soft_shutdown" then
+        print("[PBI CORE] INITIATING SOFT SHUTDOWN (UPDATE)...")
+        local TeleportService = game:GetService("TeleportService")
+        local placeId = game.PlaceId
+        
+        -- Notify
+        local h = Instance.new("Hint")
+        h.Text = "[SYSTEM]: Server updating. Teleporting to new version..."
+        h.Parent = workspace
+        
+        task.wait(2) -- Give time to read
+        
+        local players = Players:GetPlayers()
+        if #players > 0 then
+            -- TeleportPartyAsync is best for keeping groups together, but relies on a single SafeTeleport usually.
+            -- Simple loop is robust enough for basic "rejoin".
+            -- Better: Use TeleportService:TeleportPartyAsync(placeId, players)
+            
+            local success, err = pcall(function()
+                TeleportService:TeleportPartyAsync(placeId, players)
+            end)
+            
+            if not success then
+                warn("Teleport Party Failed: " .. tostring(err))
+                -- Fallback
+                for _, p in pairs(players) do
+                    TeleportService:Teleport(placeId, p)
+                end
+            end
+        end
+        return
+    end
+
     -- CHECK FOR SERVER SHUTDOWN
     if action == "shutdown_server" then
         if target == JOB_ID then

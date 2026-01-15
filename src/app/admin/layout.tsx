@@ -9,7 +9,8 @@ import {
     Users,
     Gamepad2,
     Hammer,
-    Code
+    Code,
+    RefreshCw
 } from 'lucide-react'
 
 
@@ -55,6 +56,7 @@ export default async function AdminLayout({
                         Development
                     </div>
                     <NavItem href="/admin/developers" icon={<Code />} label="Developers" />
+                    <NavItem href="/admin/update" icon={<RefreshCw />} label="Update" />
 
                     <div className="pt-4 pb-2 px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                         System
