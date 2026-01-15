@@ -1,67 +1,91 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
     try {
         console.log('[DISCORD] ===== NEW REQUEST =====');
-        console.log('[DISCORD] Method:', request.method);
-        console.log('[DISCORD] URL:', request.url);
 
         const PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY;
 
         if (!PUBLIC_KEY) {
             console.error('[DISCORD] DISCORD_PUBLIC_KEY is not set!');
-            return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+            return new NextResponse(
+                JSON.stringify({ error: 'Server configuration error' }),
+                { status: 500, headers: { 'Content-Type': 'application/json' } }
+            );
         }
 
-        console.log('[DISCORD] PUBLIC_KEY exists');
-
         const body = await request.text();
-        console.log('[DISCORD] Body received, length:', body.length);
-        console.log('[DISCORD] Body content:', body.substring(0, 200));
+        console.log('[DISCORD] Body length:', body.length);
 
         let interaction;
         try {
             interaction = JSON.parse(body);
         } catch (e: any) {
             console.error('[DISCORD] JSON parse error:', e.message);
-            return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+            return new NextResponse(
+                JSON.stringify({ error: 'Invalid JSON' }),
+                { status: 400, headers: { 'Content-Type': 'application/json' } }
+            );
         }
 
         console.log('[DISCORD] Interaction type:', interaction.type);
-        console.log('[DISCORD] Full interaction:', JSON.stringify(interaction));
 
-        // Type 1 = PING
+        // Type 1 = PING - Discord verification
         if (interaction.type === 1) {
             console.log('[DISCORD] ✅ Responding to PING');
-            return NextResponse.json({ type: 1 });
+            return new NextResponse(
+                JSON.stringify({ type: 1 }),
+                {
+                    status: 200,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
         }
 
         // Type 2 = Application Command
         if (interaction.type === 2) {
             console.log('[DISCORD] Received command:', interaction.data?.name);
-            return NextResponse.json({
-                type: 4,
-                data: { content: 'Command received! Bot is being configured...' }
-            });
+            return new NextResponse(
+                JSON.stringify({
+                    type: 4,
+                    data: { content: 'Command received!' }
+                }),
+                {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' }
+                }
+            );
         }
 
-        console.log('[DISCORD] Unknown interaction type');
-        return NextResponse.json({ error: 'Unknown type' }, { status: 400 });
+        return new NextResponse(
+            JSON.stringify({ error: 'Unknown type' }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
 
     } catch (error: any) {
         console.error('[DISCORD] ❌ ERROR:', error.message);
-        console.error('[DISCORD] Stack:', error.stack);
-        return NextResponse.json({
-            error: 'Internal server error',
-            message: error.message
-        }, { status: 500 });
+        return new NextResponse(
+            JSON.stringify({
+                error: 'Internal server error',
+                message: error.message
+            }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
     }
 }
 
 export async function GET() {
-    return NextResponse.json({
-        status: 'Discord webhook endpoint is running',
-        configured: !!process.env.DISCORD_PUBLIC_KEY,
-        timestamp: new Date().toISOString()
-    });
+    return new NextResponse(
+        JSON.stringify({
+            status: 'Discord webhook endpoint is running',
+            configured: !!process.env.DISCORD_PUBLIC_KEY,
+            timestamp: new Date().toISOString()
+        }),
+        {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        }
+    );
 }
