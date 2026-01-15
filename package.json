@@ -12,6 +12,7 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.89.0",
     "clsx": "^2.1.1",
+    "discord-interactions": "^4.4.0",
     "discord.js": "^14.25.1",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
