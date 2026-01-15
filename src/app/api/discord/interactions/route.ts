@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { verifyKey } from 'discord-interactions';
 
 export async function POST(request: Request) {
     try {
@@ -14,8 +15,33 @@ export async function POST(request: Request) {
             );
         }
 
+        // Get signature headers
+        const signature = request.headers.get('x-signature-ed25519');
+        const timestamp = request.headers.get('x-signature-timestamp');
+
+        if (!signature || !timestamp) {
+            console.error('[DISCORD] Missing signature headers');
+            return new NextResponse(
+                JSON.stringify({ error: 'Missing signature' }),
+                { status: 401, headers: { 'Content-Type': 'application/json' } }
+            );
+        }
+
         const body = await request.text();
         console.log('[DISCORD] Body length:', body.length);
+
+        // Verify signature
+        const isValidRequest = verifyKey(body, signature, timestamp, PUBLIC_KEY);
+
+        if (!isValidRequest) {
+            console.error('[DISCORD] Invalid signature!');
+            return new NextResponse(
+                JSON.stringify({ error: 'Invalid request signature' }),
+                { status: 401, headers: { 'Content-Type': 'application/json' } }
+            );
+        }
+
+        console.log('[DISCORD] ✅ Signature verified');
 
         let interaction;
         try {
@@ -66,6 +92,7 @@ export async function POST(request: Request) {
 
     } catch (error: any) {
         console.error('[DISCORD] ❌ ERROR:', error.message);
+        console.error('[DISCORD] Stack:', error.stack);
         return new NextResponse(
             JSON.stringify({
                 error: 'Internal server error',
