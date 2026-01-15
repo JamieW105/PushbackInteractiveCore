@@ -18,7 +18,7 @@ local RunService = game:GetService("RunService")
 
 -- CONFIGURATION
 local TOPIC_NAME = "AdminActions"
-local API_URL = "http://192.168.68.120:3000/api/roblox" -- REPLACE THIS
+local API_URL = "https://pushback-interactive-core.vercel.app/api/roblox" -- REPLACE THIS
 local API_KEY = "7f3b9c2a1e8d4f5b6c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8" -- Matches .env.local
 
 local JOB_ID = game.JobId ~= "" and game.JobId or "STUDIO_TEST_" .. os.time()
@@ -184,30 +184,33 @@ local function handleMessage(message)
         local TeleportService = game:GetService("TeleportService")
         local placeId = game.PlaceId
         
+        -- 1. Reserve a temporary private server
+        local code = TeleportService:ReserveServer(placeId)
+        local players = Players:GetPlayers()
+        
         -- Notify
         local h = Instance.new("Hint")
-        h.Text = "[SYSTEM]: Server updating. Teleporting to new version..."
+        h.Text = "[SYSTEM]: Server updating... Bouncing to new version."
         h.Parent = workspace
+        task.wait(2)
         
-        task.wait(2) -- Give time to read
+        -- 2. Teleport to Reserved Server with Data
+        -- This ensures they leave the current specific instance.
+        local teleportOptions = Instance.new("TeleportOptions")
+        teleportOptions.ShouldReserveServer = true -- Helper, but we rely on ToPrivateServer mostly or options
+        -- Actually, TeleportToPrivateServer is the dedicated method.
         
-        local players = Players:GetPlayers()
-        if #players > 0 then
-            -- TeleportPartyAsync is best for keeping groups together, but relies on a single SafeTeleport usually.
-            -- Simple loop is robust enough for basic "rejoin".
-            -- Better: Use TeleportService:TeleportPartyAsync(placeId, players)
-            
-            local success, err = pcall(function()
-                TeleportService:TeleportPartyAsync(placeId, players)
-            end)
-            
-            if not success then
-                warn("Teleport Party Failed: " .. tostring(err))
-                -- Fallback
-                for _, p in pairs(players) do
-                    TeleportService:Teleport(placeId, p)
-                end
-            end
+        local success, err = pcall(function()
+            -- Pass "isSoftShutdown" in TeleportData
+            TeleportService:TeleportToPrivateServer(placeId, code, players, nil, { isSoftShutdown = true })
+        end)
+        
+        if not success then
+             warn("Soft Shutdown Teleport Failed: " .. tostring(err))
+             -- Panic Fallback: Just rejoin public
+              for _, p in pairs(players) do
+                 TeleportService:Teleport(placeId, p)
+             end
         end
         return
     end
@@ -249,3 +252,47 @@ end
 
 MessagingService:SubscribeAsync(TOPIC_NAME, handleMessage)
 print("[PBI CORE] Admin System Subscribed.")
+
+-------------------------------------------------------------------------------
+-- 6. STARTUP: DETECT SOFT SHUTDOWN SERVER
+-------------------------------------------------------------------------------
+-- If this server is a RESERVED server (bounce server), we wait and send them back.
+local function onPlayerAdded(player)
+    local joinData = player:GetJoinData()
+    local teleportData = joinData.TeleportData
+    
+    if teleportData and teleportData.isSoftShutdown then
+        print("[PBI CORE] Soft Shutdown Bounce Server Detected for " .. player.Name)
+        
+        -- Display Message
+        local screenGui = Instance.new("ScreenGui", player.PlayerGui)
+        local frame = Instance.new("Frame", screenGui)
+        frame.Size = UDim2.new(1, 0, 1, 0)
+        frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        frame.BackgroundTransparency = 0.5
+        
+        local textLabel = Instance.new("TextLabel", frame)
+        textLabel.Size = UDim2.new(1, 0, 0.2, 0)
+        textLabel.Position = UDim2.new(0, 0, 0.4, 0)
+        textLabel.BackgroundTransparency = 1
+        textLabel.Text = "Updating Server...\nPlease wait a moment..."
+        textLabel.TextColor3 = Color3.new(1, 1, 1)
+        textLabel.TextScaled = true
+        
+        -- Wait for old servers to likely die and new update to propagate
+        task.wait(5)
+        
+        -- Send back to public place (Main Game)
+        local TeleportService = game:GetService("TeleportService")
+        TeleportService:Teleport(game.PlaceId, player)
+    end
+end
+
+-- Hook up if it might be a private server
+if game.PrivateServerId ~= "" then
+    Players.PlayerAdded:Connect(onPlayerAdded)
+    -- Handle players already here
+    for _, p in pairs(Players:GetPlayers()) do
+        onPlayerAdded(p)
+    end
+end

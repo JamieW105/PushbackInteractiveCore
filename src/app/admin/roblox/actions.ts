@@ -67,6 +67,8 @@ export async function getRobloxPlayerInfo(username: string) {
     }
 }
 
+import { sendRobloxMessageInternal } from "@/lib/roblox-internal"
+
 export async function sendRobloxMessage(
     targetInput: string, // User ID or Username
     actionType: string,
@@ -74,56 +76,9 @@ export async function sendRobloxMessage(
 ) {
     const supabase = await createClient()
 
-    // 1. Auth Check
+    // 1. Auth Check (Keep this for the Server Action)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Unauthorized' }
 
-    // 2. Env Config
-    const apiKey = process.env.ROBLOX_OPEN_CLOUD_KEY
-    const universeId = process.env.ROBLOX_UNIVERSE_ID
-
-    if (!apiKey || !universeId) {
-        return { success: false, error: 'Roblox API Key or Universe ID not configured.' }
-    }
-
-    try {
-        const topic = "AdminActions"
-        const url = `https://apis.roblox.com/messaging-service/v1/universes/${universeId}/topics/${topic}`
-
-        const payload = {
-            message: JSON.stringify({
-                target: targetInput,
-                action: actionType,
-                data: messageData,
-                admin: user.email // Log who did it
-            })
-        }
-
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'x-api-key': apiKey,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        })
-
-        if (!response.ok) {
-            const err = await response.text()
-            throw new Error(`Roblox API Error: ${response.status} ${err}`)
-        }
-
-        // 5. Log to DB
-        await supabase.from('bot_management_logs').insert({
-            user_id: user.id,
-            action: `roblox_${actionType}`,
-            details: { target: targetInput, data: messageData }
-        })
-
-        return { success: true, message: 'Command sent to Roblox servers.' }
-
-    } catch (error: any) {
-        console.error('Roblox Action Failed:', error)
-        return { success: false, error: error.message }
-    }
+    return await sendRobloxMessageInternal(targetInput, actionType, messageData, user.email || 'Unknown', user.id)
 }

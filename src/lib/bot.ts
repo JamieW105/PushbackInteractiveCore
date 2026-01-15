@@ -55,6 +55,26 @@ export const getMgmtBot = async () => {
     try {
         await client.login(process.env.DISCORD_BOT_TOKEN_MGMT);
         globalForBot.mgmtClient = client;
+
+        // Register slash commands and set up handler
+        const { registerMgmtCommands, handleMgmtInteraction } = await import('./mgmt-commands');
+
+        client.once('ready', async () => {
+            console.log(`[BOT] Management Bot logged in as ${client.user?.tag}`);
+            // Register commands (use guild ID for faster dev, or omit for global)
+            // You can add DISCORD_GUILD_ID to .env for faster testing
+            await registerMgmtCommands(
+                process.env.DISCORD_BOT_TOKEN_MGMT!,
+                client.user!.id,
+                process.env.DISCORD_GUILD_ID // Optional
+            );
+        });
+
+        client.on('interactionCreate', async (interaction) => {
+            if (!interaction.isChatInputCommand()) return;
+            await handleMgmtInteraction(interaction);
+        });
+
         return client;
     } catch (err) {
         console.error('[BOT] Mgmt Login Failed:', err);
